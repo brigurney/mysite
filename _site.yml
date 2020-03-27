@@ -1,0 +1,14 @@
+---
+name: "mywebsite"
+output_dir: "docs"
+navbar:
+  title: "Bri's Site"
+  left:
+  - text: "Home"
+    href: index.html
+  - text: "Llama Cards"
+    href: llama-cards.html
+output:
+  html_document:
+theme: cosmo
+---
