@@ -1,27 +1,137 @@
 ---
-title: "llama-cards"
+title: "Llama Cards Simulation"
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# get points for a given hand
+```{r}
+getpoints <- function(hand) {
+  hand[hand == 7] <- 10
+  points <- sum(unique(hand))
+  return(points)
+}
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+# choose card to play or draw
+```{r}
+choosehigher <- function(llama, hand, cont) {
+  discard1 <- llama$discard + 1
+  if(discard1 == 8) discard1 <- 1
+  if(!cont) {return(list(llama = llama, hand = hand, cont = cont))}
+  if(length(hand) == 0) {return(list(llama = llama, hand = hand, cont = FALSE))}
+  
+  same <- llama$discard %in% hand
+  higher <- discard1 %in% hand
+  #strategy is always play the higher card if stuck between the two
+  if ((same & higher) | (higher & !same)) {
+    play <- which(hand == discard1)[1]
+    llama$discard <- hand[play]
+    hand <- hand[-play]
+  } else if (same & !higher) {
+    play <- which(hand == llama$discard)[1]
+    llama$discard <- hand[play]
+    hand <- hand[-play]
+  } else if (!same & !higher) {
+    if (length(llama$deck) == 0) {
+      cont <- FALSE
+    } else {
+      hand <- c(hand, llama$deck[1])
+      llama$deck <- llama$deck[-1]
+    }
+  }
+  return(list(llama = llama, hand = hand, cont = cont))
+}
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+# Choose the lower of the two cards if you can play
+```{r}
+chooselower <- function(llama, hand, cont) {
+  discard1 <- llama$discard + 1
+  if(discard1 == 8) discard1 <- 1
+  if(!cont) {return(list(llama = llama, hand = hand, cont = cont))}
+  if(length(hand) == 0) {return(list(llama = llama, hand = hand, cont = FALSE))}
+  
+  same <- llama$discard %in% hand
+  higher <- discard1 %in% hand
+  #strategy is always play the lower card if stuck between the two
+  if (higher & !same) {
+    play <- which(hand == discard1)[1]
+    llama$discard <- hand[play]
+    hand <- hand[-play]
+  } else if ((same & higher) | (same & !higher)) {
+    play <- which(hand == llama$discard)[1]
+    llama$discard <- hand[play]
+    hand <- hand[-play]
+  } else if (!same & !higher) {
+    if (length(llama$deck) == 0) {
+      cont <- FALSE
+    } else {
+      hand <- c(hand, llama$deck[1])
+      llama$deck <- llama$deck[-1]
+    }
+  }
+  return(list(llama = llama, hand = hand, cont = cont))
+}
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# simulate playing a round
+```{r}
+playround <- function(inllama) {
+  llama <- inllama
+  nplayers <- length(llama$hands)
+  
+  for(i in 1:nplayers) {
+    turn <- chooselower(llama, hand = llama$hands[[i]], cont = llama$cont[i])
+    llama <- turn$llama
+    llama$hands[[i]] <- turn$hand
+    llama$cont[i] <- turn$cont
+  }
+  llama
+  
+  return(llama)
+}
+```
+
+simulation
+```{r}
+sim <- replicate(1000, {
+  # set up the deck
+  # 7 is llama
+  deck <- rep(c(1,2,3,4,5,6,7), 8)
+  # shuffle the deck
+  # set.seed(2019)
+  deck <- sample(deck)
+  
+  # deal cards
+  nplayers <- 6
+  hands <- matrix(deck[1:(6*nplayers)], nrow = nplayers, ncol = 6)
+  hands <- tapply(hands, rep(1:nrow(hands), ncol(hands)), function(i)i)
+  deck <- deck[-(1:(6*nplayers))]
+  
+  # take one off the top
+  discard <- deck[1]
+  deck <- deck[-1]
+  
+  # set them all up in one list
+  llama <- list(discard = discard, hands = hands, deck = deck, cont = rep(TRUE, nplayers))
+  
+  while(sum(llama$cont) > 0) {
+    llama <- playround(llama)
+  }
+
+  points <- numeric(nplayers)
+  for(i in 1:nplayers) {
+    points[i] <- getpoints(llama$hands[[i]])
+  }
+  return(points)
+})
+```
+
+average points per round
+```{r}
+rowMeans(sim)
+```
+
+how often will you finish the round without cards?
+```{r}
+rowMeans(sim == 0)
+```
