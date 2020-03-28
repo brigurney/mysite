@@ -1,6 +1,7 @@
 ---
 title: "Llama Cards Simulation"
 ---
+Instructions can be found at: https://www.amigo.games/content/ap/rule/19420--031-2019-Lama_Manual_002_LAYOUT[1].pdf
 
 # get points for a given hand
 ```{r}
