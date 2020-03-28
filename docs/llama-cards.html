@@ -11,7 +11,7 @@
 
 
 
-<title>llama-cards</title>
+<title>Llama Cards Simulation</title>
 
 <script src="site_libs/jquery-1.11.3/jquery.min.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -289,29 +289,134 @@ $(document).ready(function () {
 
 
 
-<h1 class="title toc-ignore">llama-cards</h1>
+<h1 class="title toc-ignore">Llama Cards Simulation</h1>
 
 </div>
 
 
-<div id="r-markdown" class="section level2">
-<h2>R Markdown</h2>
-<p>This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <a href="http://rmarkdown.rstudio.com" class="uri">http://rmarkdown.rstudio.com</a>.</p>
-<p>When you click the <strong>Knit</strong> button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:</p>
-<pre class="r"><code>summary(cars)</code></pre>
-<pre><code>##      speed           dist       
-##  Min.   : 4.0   Min.   :  2.00  
-##  1st Qu.:12.0   1st Qu.: 26.00  
-##  Median :15.0   Median : 36.00  
-##  Mean   :15.4   Mean   : 42.98  
-##  3rd Qu.:19.0   3rd Qu.: 56.00  
-##  Max.   :25.0   Max.   :120.00</code></pre>
+<p>Instructions can be found at: <a href="https://www.amigo.games/content/ap/rule/19420--031-2019-Lama_Manual_002_LAYOUT%5B1%5D.pdf" class="uri">https://www.amigo.games/content/ap/rule/19420--031-2019-Lama_Manual_002_LAYOUT[1].pdf</a></p>
+<div id="get-points-for-a-given-hand" class="section level1">
+<h1>get points for a given hand</h1>
+<pre class="r"><code>getpoints &lt;- function(hand) {
+  hand[hand == 7] &lt;- 10
+  points &lt;- sum(unique(hand))
+  return(points)
+}</code></pre>
 </div>
-<div id="including-plots" class="section level2">
-<h2>Including Plots</h2>
-<p>You can also embed plots, for example:</p>
-<p><img src="llama-cards_files/figure-html/pressure-1.png" width="672" /></p>
-<p>Note that the <code>echo = FALSE</code> parameter was added to the code chunk to prevent printing of the R code that generated the plot.</p>
+<div id="choose-card-to-play-or-draw" class="section level1">
+<h1>choose card to play or draw</h1>
+<pre class="r"><code>choosehigher &lt;- function(llama, hand, cont) {
+  discard1 &lt;- llama$discard + 1
+  if(discard1 == 8) discard1 &lt;- 1
+  if(!cont) {return(list(llama = llama, hand = hand, cont = cont))}
+  if(length(hand) == 0) {return(list(llama = llama, hand = hand, cont = FALSE))}
+  
+  same &lt;- llama$discard %in% hand
+  higher &lt;- discard1 %in% hand
+  #strategy is always play the higher card if stuck between the two
+  if ((same &amp; higher) | (higher &amp; !same)) {
+    play &lt;- which(hand == discard1)[1]
+    llama$discard &lt;- hand[play]
+    hand &lt;- hand[-play]
+  } else if (same &amp; !higher) {
+    play &lt;- which(hand == llama$discard)[1]
+    llama$discard &lt;- hand[play]
+    hand &lt;- hand[-play]
+  } else if (!same &amp; !higher) {
+    if (length(llama$deck) == 0) {
+      cont &lt;- FALSE
+    } else {
+      hand &lt;- c(hand, llama$deck[1])
+      llama$deck &lt;- llama$deck[-1]
+    }
+  }
+  return(list(llama = llama, hand = hand, cont = cont))
+}</code></pre>
+</div>
+<div id="choose-the-lower-of-the-two-cards-if-you-can-play" class="section level1">
+<h1>Choose the lower of the two cards if you can play</h1>
+<pre class="r"><code>chooselower &lt;- function(llama, hand, cont) {
+  discard1 &lt;- llama$discard + 1
+  if(discard1 == 8) discard1 &lt;- 1
+  if(!cont) {return(list(llama = llama, hand = hand, cont = cont))}
+  if(length(hand) == 0) {return(list(llama = llama, hand = hand, cont = FALSE))}
+  
+  same &lt;- llama$discard %in% hand
+  higher &lt;- discard1 %in% hand
+  #strategy is always play the lower card if stuck between the two
+  if (higher &amp; !same) {
+    play &lt;- which(hand == discard1)[1]
+    llama$discard &lt;- hand[play]
+    hand &lt;- hand[-play]
+  } else if ((same &amp; higher) | (same &amp; !higher)) {
+    play &lt;- which(hand == llama$discard)[1]
+    llama$discard &lt;- hand[play]
+    hand &lt;- hand[-play]
+  } else if (!same &amp; !higher) {
+    if (length(llama$deck) == 0) {
+      cont &lt;- FALSE
+    } else {
+      hand &lt;- c(hand, llama$deck[1])
+      llama$deck &lt;- llama$deck[-1]
+    }
+  }
+  return(list(llama = llama, hand = hand, cont = cont))
+}</code></pre>
+</div>
+<div id="simulate-playing-a-round" class="section level1">
+<h1>simulate playing a round</h1>
+<pre class="r"><code>playround &lt;- function(inllama) {
+  llama &lt;- inllama
+  nplayers &lt;- length(llama$hands)
+  
+  for(i in 1:nplayers) {
+    turn &lt;- chooselower(llama, hand = llama$hands[[i]], cont = llama$cont[i])
+    llama &lt;- turn$llama
+    llama$hands[[i]] &lt;- turn$hand
+    llama$cont[i] &lt;- turn$cont
+  }
+  llama
+  
+  return(llama)
+}</code></pre>
+<p>simulation</p>
+<pre class="r"><code>sim &lt;- replicate(1000, {
+  # set up the deck
+  # 7 is llama
+  deck &lt;- rep(c(1,2,3,4,5,6,7), 8)
+  # shuffle the deck
+  # set.seed(2019)
+  deck &lt;- sample(deck)
+  
+  # deal cards
+  nplayers &lt;- 6
+  hands &lt;- matrix(deck[1:(6*nplayers)], nrow = nplayers, ncol = 6)
+  hands &lt;- tapply(hands, rep(1:nrow(hands), ncol(hands)), function(i)i)
+  deck &lt;- deck[-(1:(6*nplayers))]
+  
+  # take one off the top
+  discard &lt;- deck[1]
+  deck &lt;- deck[-1]
+  
+  # set them all up in one list
+  llama &lt;- list(discard = discard, hands = hands, deck = deck, cont = rep(TRUE, nplayers))
+  
+  while(sum(llama$cont) &gt; 0) {
+    llama &lt;- playround(llama)
+  }
+
+  points &lt;- numeric(nplayers)
+  for(i in 1:nplayers) {
+    points[i] &lt;- getpoints(llama$hands[[i]])
+  }
+  return(points)
+})</code></pre>
+<p>average points per round</p>
+<pre class="r"><code>rowMeans(sim)</code></pre>
+<pre><code>## [1] 5.192 5.374 5.092 5.067 5.156 5.217</code></pre>
+<p>how often will you finish the round without cards?</p>
+<pre class="r"><code>rowMeans(sim == 0)</code></pre>
+<pre><code>## [1] 0.352 0.343 0.360 0.387 0.362 0.335</code></pre>
 </div>
 
 
