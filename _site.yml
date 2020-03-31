@@ -8,6 +8,8 @@ navbar:
     href: index.html
   - text: "Llama Cards"
     href: llama-cards.html
+  - text: "Prophet Survival Analysis"
+    href: prophet-surv.html
 output:
   html_document:
 theme: cosmo

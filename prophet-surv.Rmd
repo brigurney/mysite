@@ -1,0 +1,35 @@
+---
+title: "Prophet Survival Analysis"
+---
+
+The American Statistician published an article in 2018 which investigated the question: How long do popes live? The article conducts a survival analysis to determine how long a pope will live after becoming pope. The article can be found at the following link: https://www.tandfonline.com/doi/full/10.1080/00031305.2017.1328374
+
+As a member of the Church of Jesus Christ of Latter-day Saints, I attempted a similar analysis on the prophets that have led our church since its restoration in 1820. There have only been 17 prophets, so the dataset is much smaller, but the analysis is still similar.
+
+### Look at the data
+```{r}
+props <- read.table("prophets.csv", header = TRUE, sep = ",")
+
+library(Epi)
+Lexis.diagram(age = c(10, 100), alab = "Age During Calling", date = c(1815, 2025), dlab = "Calendar Time", int = c(10,25), lab.int = c(10, 50), entry.date = props$Year.Called, entry.age = props$Age.Called, exit.age = props$Age.Died, exit.date = props$Year.Died, fail = props$Censored, pch.fail = c(16,17), col.fail = c('black', 'gray'), age.grid = TRUE, main = "Lexis Diagram for Latter-Day Prophets")
+```
+
+Each line on the Lexis Diagram represents one prophet, with the black circle representing his time of death. The gray triangle represents a censored observation. This is the current prophet, who has not yet died.
+
+### Fit a survival Model
+The article only seeks to determine how the age and year at which one becomes pope impacts one's survival time. Similarly, I will only investigate the effect of these two variables on prophet survival.
+```{r}
+library(survival)
+x_1 <- props$Age.Called
+x_2 <- props$Year.Called
+s <- survreg(Surv(props$Survival, props$Censored == 0) ~ x_1 + x_2)
+summary(s)
+```
+
+
+```{r}
+preds <- predict(s, se.fit = TRUE)
+mse <- sum((preds$fit - props$Survival)^2)
+rmse <- sqrt(mse)
+rmse
+```
