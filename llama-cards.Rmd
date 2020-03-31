@@ -3,7 +3,13 @@ title: "Llama Cards Simulation"
 ---
 Instructions can be found at: https://www.amigo.games/content/ap/rule/19420--031-2019-Lama_Manual_002_LAYOUT[1].pdf
 
-# get points for a given hand
+This simulation hopes to investigate the difference between two strategies: when facing a decision between playing two different cards, choosing to play either the lower card or the higher card. 
+To quantify this, the simulation will determine the average points per game, the percentage of times a player will end with no cards, or 0 points, and investigate which order is most conducive to winning.
+In the actual game, you can decide to stop playing at any point, however, for simplicity, this simulation will assume all players will play until either they run out of cards, or the deck runs out of cards. Additionally, the simulation will assume all players adopt the same strategy.
+
+### Formulas
+To begin the simulation, I will set up a few formulas.
+First, a formula to calculate the amount of points a given hand is worth.
 ```{r}
 getpoints <- function(hand) {
   hand[hand == 7] <- 10
@@ -12,76 +18,62 @@ getpoints <- function(hand) {
 }
 ```
 
-# choose card to play or draw
+Second, a function that simulates one player's turn
 ```{r}
-choosehigher <- function(llama, hand, cont) {
+playturn <- function(llama, hand, cont) {
+  # Set up the two possible cards that can be played
+  # one higher than the discard:
   discard1 <- llama$discard + 1
-  if(discard1 == 8) discard1 <- 1
+  if(discard1 == 8) discard1 <- 1 # a card of 1 is considered "higher" than a card of 7, since it restarts the cycle
+  
+  # if they player has already decided to stop playing cards, exit this function and keep hand the same
   if(!cont) {return(list(llama = llama, hand = hand, cont = cont))}
+  # if you have no cards left, this function is exited, and your continue status is set to FALSE
   if(length(hand) == 0) {return(list(llama = llama, hand = hand, cont = FALSE))}
   
+  # Do you have the same card or one higher in your hand?
   same <- llama$discard %in% hand
   higher <- discard1 %in% hand
-  #strategy is always play the higher card if stuck between the two
-  if ((same & higher) | (higher & !same)) {
+  
+  if (same & higher) {
+    # if you can play both the same card and one higher, go based off the strategy:
+    ifelse(llama$strategy == "lower", play <- which(hand == llama$discard)[1], play <- which(hand == discard1)[1])
+    llama$discard <- hand[play]
+    hand <- hand[-play]
+  } else if (higher & !same) {
+    # if you can only play the higher card, play the higher card
     play <- which(hand == discard1)[1]
     llama$discard <- hand[play]
     hand <- hand[-play]
-  } else if (same & !higher) {
+  } else if (same & !higher) { 
+    # if you only have the same card and not one higher, play the same card
     play <- which(hand == llama$discard)[1]
     llama$discard <- hand[play]
     hand <- hand[-play]
-  } else if (!same & !higher) {
-    if (length(llama$deck) == 0) {
+  } else if (!same & !higher) { 
+    # if you can't play, draw a card
+    if (length(llama$deck) == 0) { 
+      # if there are no cards to draw, you must stop your turn
       cont <- FALSE
     } else {
       hand <- c(hand, llama$deck[1])
       llama$deck <- llama$deck[-1]
     }
   }
+  # return a list with the updated play
   return(list(llama = llama, hand = hand, cont = cont))
 }
 ```
 
-# Choose the lower of the two cards if you can play
-```{r}
-chooselower <- function(llama, hand, cont) {
-  discard1 <- llama$discard + 1
-  if(discard1 == 8) discard1 <- 1
-  if(!cont) {return(list(llama = llama, hand = hand, cont = cont))}
-  if(length(hand) == 0) {return(list(llama = llama, hand = hand, cont = FALSE))}
-  
-  same <- llama$discard %in% hand
-  higher <- discard1 %in% hand
-  #strategy is always play the lower card if stuck between the two
-  if (higher & !same) {
-    play <- which(hand == discard1)[1]
-    llama$discard <- hand[play]
-    hand <- hand[-play]
-  } else if ((same & higher) | (same & !higher)) {
-    play <- which(hand == llama$discard)[1]
-    llama$discard <- hand[play]
-    hand <- hand[-play]
-  } else if (!same & !higher) {
-    if (length(llama$deck) == 0) {
-      cont <- FALSE
-    } else {
-      hand <- c(hand, llama$deck[1])
-      llama$deck <- llama$deck[-1]
-    }
-  }
-  return(list(llama = llama, hand = hand, cont = cont))
-}
-```
-
-# simulate playing a round
+This last function simulates playing a round (one turn for each player).
 ```{r}
 playround <- function(inllama) {
   llama <- inllama
   nplayers <- length(llama$hands)
   
+  # each player takes a turn 
   for(i in 1:nplayers) {
-    turn <- chooselower(llama, hand = llama$hands[[i]], cont = llama$cont[i])
+    turn <- playturn(llama, hand = llama$hands[[i]], cont = llama$cont[i])
     llama <- turn$llama
     llama$hands[[i]] <- turn$hand
     llama$cont[i] <- turn$cont
@@ -92,33 +84,40 @@ playround <- function(inllama) {
 }
 ```
 
-simulation
+### Simulation
+Now let's simulate this to determine what strategy results in the lowest possible points per game
 ```{r}
-sim <- replicate(1000, {
-  # set up the deck
-  # 7 is llama
-  deck <- rep(c(1,2,3,4,5,6,7), 8)
+# set up the number of players, can be anywhere between 2 and 6
+nplayers <- 4
+
+# set up the deck, where 7 represents the "llama" card
+deck <- rep(c(1,2,3,4,5,6,7), 8)
+```
+
+Simulate 1000 games with the lower strategy
+```{r}
+simLOW <- replicate(1000, {
   # shuffle the deck
-  # set.seed(2019)
-  deck <- sample(deck)
+  thisdeck <- sample(deck)
   
-  # deal cards
-  nplayers <- 6
-  hands <- matrix(deck[1:(6*nplayers)], nrow = nplayers, ncol = 6)
+  # deal 6 cards to each player
+  hands <- matrix(thisdeck[1:(6*nplayers)], nrow = nplayers, ncol = 6)
   hands <- tapply(hands, rep(1:nrow(hands), ncol(hands)), function(i)i)
-  deck <- deck[-(1:(6*nplayers))]
+  thisdeck <- thisdeck[-(1:(6*nplayers))]
   
-  # take one off the top
-  discard <- deck[1]
-  deck <- deck[-1]
+  # take one card off the top of the deck to start the discard pile
+  discard <- thisdeck[1]
+  thisdeck <- thisdeck[-1]
   
-  # set them all up in one list
-  llama <- list(discard = discard, hands = hands, deck = deck, cont = rep(TRUE, nplayers))
+  # set all these details up in one list
+  llama <- list(discard = discard, hands = hands, deck = thisdeck, cont = rep(TRUE, nplayers), strategy = "lower")
   
+  # repeat rounds until all players have decided to stop playing
   while(sum(llama$cont) > 0) {
     llama <- playround(llama)
   }
-
+  
+  # calculate the points per player
   points <- numeric(nplayers)
   for(i in 1:nplayers) {
     points[i] <- getpoints(llama$hands[[i]])
@@ -127,12 +126,67 @@ sim <- replicate(1000, {
 })
 ```
 
-average points per round
+Simulate 1000 games with the higher strategy
 ```{r}
-rowMeans(sim)
+simHIGH <- replicate(1000, {
+  # shuffle the deck
+  thisdeck <- sample(deck)
+  
+  # deal 6 cards to each player
+  hands <- matrix(thisdeck[1:(6*nplayers)], nrow = nplayers, ncol = 6)
+  hands <- tapply(hands, rep(1:nrow(hands), ncol(hands)), function(i)i)
+  thisdeck <- thisdeck[-(1:(6*nplayers))]
+  
+  # take one card off the top of the deck to start the discard pile
+  discard <- thisdeck[1]
+  thisdeck <- thisdeck[-1]
+  
+  # set all these details up in one list
+  llama <- list(discard = discard, hands = hands, deck = thisdeck, cont = rep(TRUE, nplayers), strategy = "higher")
+  
+  # repeat rounds until all players have decided to stop playing
+  while(sum(llama$cont) > 0) {
+    llama <- playround(llama)
+  }
+  
+  # calculate the points per player
+  points <- numeric(nplayers)
+  for(i in 1:nplayers) {
+    points[i] <- getpoints(llama$hands[[i]])
+  }
+  return(points)
+})
 ```
 
-how often will you finish the round without cards?
+Let's look at the average number of points each player got for each strategy
 ```{r}
-rowMeans(sim == 0)
+rowMeans(simLOW)
+rowMeans(simHIGH)
 ```
+Choosing the lower card, results in, on average, about 3-4 points lower than does choosing the higher card.
+
+How often will you finish the round without cards, or end the game with 0 points?
+```{r}
+rowMeans(simLOW == 0)
+rowMeans(simHIGH == 0)
+```
+You have a 70% chance of finishing the game with 0 points when you choose the lower card, as compared to a 40% chance when choosing the higher card.
+
+Does the order in which you play increase your chances of winning?
+```{r}
+winnersLOW <- apply(simLOW, 2, function(x) which.min(x))
+winnersHIGH <- apply(simHIGH, 2, function(x) which.min(x))
+
+percwonLOW <- percwonHIGH <- numeric(nplayers)
+for (i in 1:nplayers) {
+  percwonLOW[i] <- mean(winnersLOW == i)
+  percwonHIGH[i] <- mean(winnersHIGH == i)
+}
+
+percwonLOW
+percwonHIGH
+```
+You have higher chances of winning if you go first, with much higher chances if you choose the lower strategy.
+
+### Conclusions
+Overall, it seems to be the best choice to always play the lower card when given a choice between two cards.
