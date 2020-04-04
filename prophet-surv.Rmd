@@ -26,10 +26,23 @@ s <- survreg(Surv(props$Survival, props$Censored == 0) ~ x_1 + x_2)
 summary(s)
 ```
 
-
+Let's investigate how far off our model's predictions are.
 ```{r}
 preds <- predict(s, se.fit = TRUE)
 mse <- sum((preds$fit - props$Survival)^2)
 rmse <- sqrt(mse)
 rmse
 ```
+Being off by 47 years is a lot, considering most humans only live for around 80-100. Perhaps there are other variables that should be included that would provide better estimates of survival time.
+
+Let's predict when the current prophet (whose observation is censored), will die.
+```{r}
+newdat <- props[nrow(props),]
+x_1_new <- newdat$Age.Called
+x_2_new <- newdat$Year.Called
+
+predsurv <- predict(s, newdata = data.frame(x_1 = x_1_new, x_2 = x_2_new), se.fit = TRUE)
+predyr <- x_2_new + predsurv$fit
+c(predyr, predyr - predsurv$se.fit, predyr + predsurv$se.fit)
+```
+This model estimates he will die in 2025, with the uncertainty ranging from 2022 to 2027.

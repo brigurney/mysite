@@ -4,3 +4,5 @@ author: "Brianne Gurney"
 ---
 
 Welcome to my website!
+It is currently a work in progress.
+For now review my two tabs demonstrating some of my work.

@@ -277,6 +277,9 @@ $(document).ready(function () {
 <li>
   <a href="llama-cards.html">Llama Cards</a>
 </li>
+<li>
+  <a href="prophet-surv.html">Prophet Survival Analysis</a>
+</li>
       </ul>
       <ul class="nav navbar-nav navbar-right">
         
@@ -330,11 +333,24 @@ summary(s)</code></pre>
 ##  Chisq= 7.18 on 2 degrees of freedom, p= 0.028 
 ## Number of Newton-Raphson Iterations: 6 
 ## n= 17</code></pre>
+<p>Let’s investigate how far off our model’s predictions are.</p>
 <pre class="r"><code>preds &lt;- predict(s, se.fit = TRUE)
 mse &lt;- sum((preds$fit - props$Survival)^2)
 rmse &lt;- sqrt(mse)
 rmse</code></pre>
 <pre><code>## [1] 47.1379</code></pre>
+<p>Being off by 47 years is a lot, considering most humans only live for around 80-100. Perhaps there are other variables that should be included that would provide better estimates of survival time.</p>
+<p>Let’s predict when the current prophet (whose observation is censored), will die.</p>
+<pre class="r"><code>newdat &lt;- props[nrow(props),]
+x_1_new &lt;- newdat$Age.Called
+x_2_new &lt;- newdat$Year.Called
+
+predsurv &lt;- predict(s, newdata = data.frame(x_1 = x_1_new, x_2 = x_2_new), se.fit = TRUE)
+predyr &lt;- x_2_new + predsurv$fit
+c(predyr, predyr - predsurv$se.fit, predyr + predsurv$se.fit)</code></pre>
+<pre><code>##        1        1        1 
+## 2025.133 2022.940 2027.327</code></pre>
+<p>This model estimates he will die in 2025, with the uncertainty ranging from 2022 to 2027.</p>
 </div>
 
 
